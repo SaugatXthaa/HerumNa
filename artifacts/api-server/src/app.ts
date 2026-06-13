@@ -1,8 +1,9 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
-import router from "./routes";
-import { logger } from "./lib/logger";
+import router from "./routes/index.js";
+import { logger } from "./lib/logger.js";
+import { createAddonRouter } from "./addon/router.js";
 
 const app: Express = express();
 
@@ -25,10 +26,18 @@ app.use(
     },
   }),
 );
-app.use(cors());
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const BASE_PATH = process.env.BASE_PATH ?? "";
+const addonBasePath = `${BASE_PATH}/addon`;
+
 app.use("/api", router);
+app.use("/addon", createAddonRouter(addonBasePath));
+
+app.get("/", (_req, res) => {
+  res.redirect("/addon/configure");
+});
 
 export default app;
