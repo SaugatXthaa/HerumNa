@@ -1,9 +1,8 @@
-import { AddonConfig, DEFAULT_CONFIG, PROVIDER_LIST } from "./types.js";
+import { AddonConfig, DEFAULT_CONFIG, PROVIDER_LIST, RESOLUTION_OPTIONS } from "./types.js";
 import { encodeConfig } from "./config.js";
 
 export function buildConfigurePage(config: AddonConfig, baseUrl: string): string {
   const providers = PROVIDER_LIST;
-  const encodedDefault = encodeConfig(DEFAULT_CONFIG);
 
   const providerCards = providers.map((p) => {
     const isEnabled = config.providers.includes(p.id);
@@ -14,15 +13,26 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
           <img src="${p.logo}" alt="${p.name}" class="provider-logo" onerror="this.style.opacity='0'" />
         </div>
         <div class="provider-meta">
-          <div class="provider-name">${p.name}</div>
+          <div class="provider-name-row">
+            <span class="provider-name">${p.name}</span>
+            <span class="status-badge" id="badge-${p.id}"></span>
+          </div>
           <div class="provider-desc">${p.description}</div>
         </div>
       </div>
-      <label class="switch">
+      <label class="switch" onclick="event.stopPropagation()">
         <input type="checkbox" class="provider-toggle" value="${p.id}" ${isEnabled ? "checked" : ""} />
         <span class="slider"></span>
       </label>
     </div>`;
+  }).join("");
+
+  const resolutionChips = RESOLUTION_OPTIONS.map((r) => {
+    const isChecked = config.resolutionFilter.includes(r.id);
+    return `<label class="res-chip ${isChecked ? "selected" : ""}">
+      <input type="checkbox" class="res-toggle" value="${r.id}" ${isChecked ? "checked" : ""} />
+      ${r.label}
+    </label>`;
   }).join("");
 
   return `<!DOCTYPE html>
@@ -36,7 +46,6 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
       --bg: #09090b;
       --surface: #111113;
@@ -49,6 +58,8 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
       --accent-glow: rgba(139,92,246,0.35);
       --green: #22c55e;
       --green-glow: rgba(34,197,94,0.25);
+      --red: #ef4444;
+      --yellow: #f59e0b;
       --text: #fafafa;
       --text-2: #a1a1aa;
       --text-3: #71717a;
@@ -56,324 +67,128 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
       --radius: 14px;
       --radius-lg: 20px;
     }
-
     html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; min-height: 100vh; line-height: 1.5; -webkit-font-smoothing: antialiased; }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      min-height: 100vh;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── HERO ── */
-    .hero {
-      position: relative;
-      overflow: hidden;
-      padding: 64px 24px 48px;
-      text-align: center;
-    }
-    .hero::before {
-      content: "";
-      position: absolute;
-      top: -120px; left: 50%;
-      transform: translateX(-50%);
-      width: 600px; height: 400px;
-      background: radial-gradient(ellipse at center, rgba(139,92,246,0.18) 0%, transparent 70%);
-      pointer-events: none;
-    }
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(139,92,246,0.12);
-      border: 1px solid rgba(139,92,246,0.3);
-      border-radius: 100px;
-      padding: 4px 12px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--accent2);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      margin-bottom: 20px;
-    }
+    /* HERO */
+    .hero { position: relative; overflow: hidden; padding: 64px 24px 48px; text-align: center; }
+    .hero::before { content: ""; position: absolute; top: -120px; left: 50%; transform: translateX(-50%); width: 600px; height: 400px; background: radial-gradient(ellipse at center, rgba(139,92,246,0.18) 0%, transparent 70%); pointer-events: none; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.3); border-radius: 100px; padding: 4px 12px; font-size: 11px; font-weight: 600; color: var(--accent2); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 20px; }
     .hero-badge::before { content: "●"; font-size: 8px; color: var(--green); }
-    .hero-title {
-      font-size: clamp(2rem, 6vw, 3.25rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      background: linear-gradient(135deg, #fff 30%, rgba(139,92,246,0.9) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 14px;
-    }
-    .hero-sub {
-      font-size: 1rem;
-      color: var(--text-2);
-      max-width: 440px;
-      margin: 0 auto;
-      font-weight: 400;
-    }
+    .hero-title { font-size: clamp(2rem, 6vw, 3.25rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; background: linear-gradient(135deg, #fff 30%, rgba(139,92,246,0.9) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 14px; }
+    .hero-sub { font-size: 1rem; color: var(--text-2); max-width: 440px; margin: 0 auto; font-weight: 400; }
 
-    /* ── LAYOUT ── */
-    .page {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: 0 20px 80px;
-    }
+    /* LAYOUT */
+    .page { max-width: 680px; margin: 0 auto; padding: 0 20px 80px; }
 
-    /* ── CARD ── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      margin-bottom: 16px;
-      overflow: hidden;
-      transition: border-color 0.2s;
-    }
+    /* CARD */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 16px; overflow: hidden; transition: border-color 0.2s; }
     .card:hover { border-color: var(--border-hover); }
-    .card-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 18px 20px 0;
-    }
-    .card-icon {
-      width: 30px; height: 30px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px;
-      flex-shrink: 0;
-    }
+    .card-header { display: flex; align-items: center; gap: 10px; padding: 18px 20px 0; }
+    .card-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
     .card-icon.purple { background: rgba(139,92,246,0.15); }
-    .card-icon.blue   { background: rgba(59,130,246,0.15); }
-    .card-icon.green  { background: rgba(34,197,94,0.15); }
+    .card-icon.blue { background: rgba(59,130,246,0.15); }
+    .card-icon.green { background: rgba(34,197,94,0.15); }
     .card-icon.orange { background: rgba(249,115,22,0.15); }
     .card-title { font-size: 0.9rem; font-weight: 600; color: var(--text); }
-    .card-sub   { font-size: 0.78rem; color: var(--text-3); margin-left: auto; }
-    .card-body  { padding: 16px 20px 20px; }
+    .card-sub { font-size: 0.78rem; color: var(--text-3); margin-left: auto; }
+    .card-body { padding: 16px 20px 20px; }
 
-    /* ── PROVIDER CARDS ── */
-    .provider-card {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 16px;
-      border-radius: var(--radius-sm);
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      margin-bottom: 8px;
-      transition: all 0.2s;
-      cursor: pointer;
-    }
+    /* PROVIDER CARDS */
+    .provider-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--surface2); border: 1px solid var(--border); margin-bottom: 8px; transition: all 0.2s; cursor: pointer; }
     .provider-card:last-child { margin-bottom: 0; }
-    .provider-card.enabled {
-      border-color: rgba(139,92,246,0.3);
-      background: rgba(139,92,246,0.06);
-    }
+    .provider-card.enabled { border-color: rgba(139,92,246,0.3); background: rgba(139,92,246,0.06); }
     .provider-card:hover { border-color: var(--border-hover); }
     .provider-card.enabled:hover { border-color: rgba(139,92,246,0.5); }
-    .provider-card-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
-    .provider-logo-wrap {
-      width: 38px; height: 38px;
-      border-radius: 10px;
-      background: var(--surface3);
-      display: flex; align-items: center; justify-content: center;
-      overflow: hidden; flex-shrink: 0;
-      border: 1px solid var(--border);
-    }
+    .provider-card-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+    .provider-logo-wrap { width: 38px; height: 38px; border-radius: 10px; background: var(--surface3); display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; border: 1px solid var(--border); }
     .provider-logo { width: 100%; height: 100%; object-fit: cover; }
-    .provider-meta { min-width: 0; }
-    .provider-name { font-size: 0.88rem; font-weight: 600; white-space: nowrap; }
-    .provider-desc { font-size: 0.75rem; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .provider-meta { min-width: 0; flex: 1; }
+    .provider-name-row { display: flex; align-items: center; gap: 7px; }
+    .provider-name { font-size: 0.88rem; font-weight: 600; }
+    .provider-desc { font-size: 0.75rem; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 
-    /* ── TOGGLE SWITCH ── */
+    /* STATUS BADGES */
+    .status-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.68rem; font-weight: 600; padding: 1px 6px; border-radius: 100px; border: 1px solid transparent; transition: all 0.3s; }
+    .status-badge.ok { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); color: var(--green); }
+    .status-badge.err { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: var(--red); }
+    .status-badge.checking { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.25); color: var(--yellow); animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.5 } }
+
+    /* TOGGLE SWITCH */
     .switch { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; }
     .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; inset: 0;
-      background: var(--surface3);
-      border-radius: 100px;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      transition: background 0.25s, border-color 0.25s;
-    }
-    .slider::before {
-      content: "";
-      position: absolute;
-      width: 18px; height: 18px;
-      top: 2px; left: 2px;
-      background: var(--text-3);
-      border-radius: 50%;
-      transition: transform 0.25s, background 0.25s;
-    }
+    .slider { position: absolute; inset: 0; background: var(--surface3); border-radius: 100px; cursor: pointer; border: 1px solid var(--border); transition: background 0.25s, border-color 0.25s; }
+    .slider::before { content: ""; position: absolute; width: 18px; height: 18px; top: 2px; left: 2px; background: var(--text-3); border-radius: 50%; transition: transform 0.25s, background 0.25s; }
     input:checked + .slider { background: var(--accent); border-color: var(--accent); }
     input:checked + .slider::before { transform: translateX(18px); background: #fff; }
 
-    /* ── FORM ELEMENTS ── */
+    /* RESOLUTION CHIPS */
+    .res-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .res-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 100px; border: 1px solid var(--border); background: var(--surface2); font-size: 0.8rem; font-weight: 500; color: var(--text-2); cursor: pointer; transition: all 0.18s; user-select: none; }
+    .res-chip input { display: none; }
+    .res-chip:hover { border-color: var(--border-hover); color: var(--text); }
+    .res-chip.selected { background: rgba(139,92,246,0.12); border-color: rgba(139,92,246,0.4); color: var(--accent2); }
+    .res-hint { font-size: 0.75rem; color: var(--text-3); margin-top: 10px; }
+
+    /* FORM ELEMENTS */
     .field { margin-bottom: 14px; }
     .field:last-child { margin-bottom: 0; }
-    .field-label {
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 0.8rem; font-weight: 500;
-      color: var(--text-2);
-      margin-bottom: 8px;
-    }
+    .field-label { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; font-weight: 500; color: var(--text-2); margin-bottom: 8px; }
     .field-hint { font-size: 0.72rem; color: var(--text-3); font-weight: 400; }
-    .input, .textarea {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text);
-      padding: 10px 14px;
-      font-size: 0.85rem;
-      font-family: 'Inter', sans-serif;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      outline: none;
-    }
-    .input:focus, .textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
-    }
+    .input, .textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); padding: 10px 14px; font-size: 0.85rem; font-family: 'Inter', sans-serif; transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+    .input:focus, .textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,92,246,0.12); }
     .textarea { resize: vertical; min-height: 72px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; line-height: 1.6; }
 
-    /* ── CHIP PILLS ── */
+    /* CHIPS */
     .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
-    .chip {
-      background: var(--surface3);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 2px 8px;
-      font-size: 0.72rem;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      color: var(--text-3);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
+    .chip { background: var(--surface3); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 0.72rem; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--text-3); cursor: pointer; transition: all 0.15s; }
     .chip:hover { border-color: var(--accent); color: var(--accent2); background: rgba(139,92,246,0.08); }
 
-    /* ── PREVIEW BOX ── */
-    .preview-wrap {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-      margin-top: 14px;
-    }
-    .preview-eyebrow {
-      font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.1em; color: var(--text-3); margin-bottom: 8px;
-    }
+    /* PREVIEW */
+    .preview-wrap { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin-top: 14px; }
+    .preview-eyebrow { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin-bottom: 8px; }
     .preview-name { font-size: 1rem; font-weight: 700; color: #fff; }
     .preview-desc { font-size: 0.82rem; color: var(--text-2); margin-top: 3px; }
 
-    /* ── RANGE SLIDER ── */
+    /* RANGE */
     .range-row { display: flex; align-items: center; gap: 14px; }
     .range-row input[type="range"] { flex: 1; accent-color: var(--accent); height: 4px; }
     .range-val { font-size: 0.85rem; font-weight: 600; color: var(--accent2); min-width: 40px; text-align: right; }
 
-    /* ── MANIFEST SECTION ── */
-    .manifest-url-box {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.75rem;
-      color: var(--accent2);
-      word-break: break-all;
-      line-height: 1.6;
-      min-height: 50px;
-      margin-bottom: 14px;
-    }
+    /* MANIFEST */
+    .manifest-url-box { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.75rem; color: var(--accent2); word-break: break-all; line-height: 1.6; min-height: 50px; margin-bottom: 14px; }
     .manifest-url-box.empty { color: var(--text-3); font-style: italic; font-family: 'Inter', sans-serif; font-size: 0.82rem; }
 
-    /* ── BUTTONS ── */
+    /* BUTTONS */
     .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 10px 18px;
-      border-radius: 10px;
-      font-size: 0.85rem; font-weight: 600;
-      cursor: pointer; border: none;
-      transition: all 0.18s;
-      font-family: 'Inter', sans-serif;
-      white-space: nowrap;
-    }
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-      box-shadow: 0 0 0 0 var(--accent-glow);
-    }
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 10px 18px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.18s; font-family: 'Inter', sans-serif; white-space: nowrap; }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 0 0 0 var(--accent-glow); }
     .btn-primary:hover { background: var(--accent2); box-shadow: 0 0 20px var(--accent-glow); }
-    .btn-ghost {
-      background: var(--surface2);
-      color: var(--text-2);
-      border: 1px solid var(--border);
-    }
+    .btn-ghost { background: var(--surface2); color: var(--text-2); border: 1px solid var(--border); }
     .btn-ghost:hover { border-color: var(--border-hover); color: var(--text); }
-    .btn-green {
-      background: rgba(34,197,94,0.12);
-      color: var(--green);
-      border: 1px solid rgba(34,197,94,0.2);
-    }
+    .btn-green { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
     .btn-green:hover { background: rgba(34,197,94,0.2); box-shadow: 0 0 16px var(--green-glow); }
+    .btn-test { background: rgba(245,158,11,0.1); color: var(--yellow); border: 1px solid rgba(245,158,11,0.25); }
+    .btn-test:hover { background: rgba(245,158,11,0.18); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* ── INSTALL STEPS ── */
+    /* INSTALL STEPS */
     .steps { display: flex; flex-direction: column; gap: 10px; }
-    .step {
-      display: flex; align-items: flex-start; gap: 12px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-    }
-    .step-num {
-      width: 24px; height: 24px;
-      border-radius: 50%;
-      background: rgba(139,92,246,0.15);
-      border: 1px solid rgba(139,92,246,0.3);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.72rem; font-weight: 700;
-      color: var(--accent2);
-      flex-shrink: 0;
-      margin-top: 1px;
-    }
-    .step-body { flex: 1; min-width: 0; }
+    .step { display: flex; align-items: flex-start; gap: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; }
+    .step-num { width: 24px; height: 24px; border-radius: 50%; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: var(--accent2); flex-shrink: 0; margin-top: 1px; }
     .step-title { font-size: 0.85rem; font-weight: 600; }
     .step-desc  { font-size: 0.78rem; color: var(--text-3); margin-top: 2px; }
 
-    /* ── DIVIDER ── */
+    /* DIVIDER */
     .divider { height: 1px; background: var(--border); margin: 16px 0; }
 
-    /* ── TOAST ── */
-    .toast {
-      position: fixed; bottom: 28px; left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: var(--green);
-      color: #fff;
-      padding: 10px 22px;
-      border-radius: 100px;
-      font-weight: 600; font-size: 0.85rem;
-      opacity: 0; pointer-events: none;
-      transition: all 0.3s; z-index: 9999;
-      box-shadow: 0 8px 32px var(--green-glow);
-    }
+    /* TOAST */
+    .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--green); color: #fff; padding: 10px 22px; border-radius: 100px; font-weight: 600; font-size: 0.85rem; opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 9999; box-shadow: 0 8px 32px var(--green-glow); }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* ── FOOTER ── */
-    .footer {
-      text-align: center;
-      padding: 32px 24px 16px;
-      font-size: 0.75rem;
-      color: var(--text-3);
-    }
+    /* FOOTER */
+    .footer { text-align: center; padding: 32px 24px 16px; font-size: 0.75rem; color: var(--text-3); }
     .footer a { color: var(--accent2); text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
 
@@ -404,6 +219,26 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
     </div>
     <div class="card-body">
       ${providerCards}
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-test" id="testBtn" onclick="testProviders()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+          Test Providers
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESOLUTION FILTER -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon purple">🎬</div>
+      <span class="card-title">Resolution Filter</span>
+    </div>
+    <div class="card-body">
+      <div class="res-chips">
+        ${resolutionChips}
+      </div>
+      <div class="res-hint">Select resolutions to include. Leave all unchecked to show every quality (highest first).</div>
     </div>
   </div>
 
@@ -463,7 +298,7 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
         <input type="range" id="timeout" min="5000" max="30000" step="1000" value="${config.timeout}" />
         <span class="range-val" id="timeoutVal">${config.timeout / 1000}s</span>
       </div>
-      <div style="font-size:0.75rem;color:var(--text-3);margin-top:10px;">Maximum wait time per provider. Higher = more streams found, slower results.</div>
+      <div style="font-size:0.75rem;color:var(--text-3);margin-top:10px;">Maximum wait time per provider. Higher = more streams, slower results.</div>
     </div>
   </div>
 
@@ -479,7 +314,7 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
           <div class="step-num">1</div>
           <div class="step-body">
             <div class="step-title">Configure your settings above</div>
-            <div class="step-desc">Toggle providers, add ShowBox cookie, adjust formatter</div>
+            <div class="step-desc">Toggle providers, filter resolution, add ShowBox cookie</div>
           </div>
         </div>
         <div class="step">
@@ -519,7 +354,7 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
     </div>
   </div>
 
-</div><!-- .page -->
+</div>
 
 <div class="footer">
   <strong>Herum Na</strong> · Nuvio Multi-Source Addon ·
@@ -550,19 +385,15 @@ function buildChips(containerId, inputId) {
 buildChips("nameChips", "nameTemplate");
 buildChips("descChips", "descTemplate");
 
-const SAMPLE = { provider: "4KHDHub", quality: "4K", size: "25.3 GB", lang: "EN", title: "Interstellar (2014)" };
+const SAMPLE = { provider: "4KHDHub", quality: "4K HDR", size: "25.3 GB", lang: "EN", title: "Interstellar (2014)" };
 
 function renderTpl(tpl) {
   return tpl.replace(/\\{(\\w+)\\}/g, (_, k) => SAMPLE[k] ?? "").replace(/\\s+/g, " ").trim();
 }
-
 function updatePreview() {
-  const n = renderTpl(document.getElementById("nameTemplate").value);
-  const d = renderTpl(document.getElementById("descTemplate").value);
-  document.getElementById("previewName").textContent = n || "—";
-  document.getElementById("previewDesc").textContent = d;
+  document.getElementById("previewName").textContent = renderTpl(document.getElementById("nameTemplate").value) || "—";
+  document.getElementById("previewDesc").textContent = renderTpl(document.getElementById("descTemplate").value);
 }
-
 document.getElementById("nameTemplate").addEventListener("input", updatePreview);
 document.getElementById("descTemplate").addEventListener("input", updatePreview);
 updatePreview();
@@ -580,7 +411,7 @@ function updateEnabledCount() {
 document.querySelectorAll(".provider-card").forEach(card => {
   const toggle = card.querySelector(".provider-toggle");
   card.addEventListener("click", (e) => {
-    if (e.target === toggle) return;
+    if (e.target.closest("label.switch")) return;
     toggle.checked = !toggle.checked;
     toggle.dispatchEvent(new Event("change"));
   });
@@ -591,7 +422,52 @@ document.querySelectorAll(".provider-card").forEach(card => {
 });
 updateEnabledCount();
 
+document.querySelectorAll(".res-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    chip.classList.toggle("selected");
+    const cb = chip.querySelector("input");
+    cb.checked = chip.classList.contains("selected");
+  });
+});
+
+async function testProviders() {
+  const btn = document.getElementById("testBtn");
+  btn.disabled = true;
+  btn.textContent = "Testing…";
+
+  const providers = document.querySelectorAll(".provider-card");
+  providers.forEach(card => {
+    const id = card.dataset.id;
+    const badge = document.getElementById("badge-" + id);
+    if (badge) { badge.className = "status-badge checking"; badge.textContent = "…"; }
+  });
+
+  try {
+    const resp = await fetch(BASE_URL + "/test-providers.json");
+    const data = await resp.json();
+    (data.providers || []).forEach(p => {
+      const badge = document.getElementById("badge-" + p.id);
+      if (!badge) return;
+      if (p.ok) {
+        badge.className = "status-badge ok";
+        badge.textContent = "✓ " + p.latencyMs + "ms";
+      } else {
+        badge.className = "status-badge err";
+        badge.textContent = "✗ down";
+      }
+    });
+  } catch {
+    document.querySelectorAll(".status-badge").forEach(b => {
+      b.className = "status-badge err"; b.textContent = "✗ error";
+    });
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg> Test Again';
+}
+
 function getConfig() {
+  const resolutionFilter = Array.from(document.querySelectorAll(".res-toggle:checked")).map(el => el.value);
   return {
     providers: Array.from(document.querySelectorAll(".provider-toggle:checked")).map(el => el.value),
     showboxCookie: document.getElementById("showboxCookie").value.trim(),
@@ -600,6 +476,7 @@ function getConfig() {
       descTemplate: document.getElementById("descTemplate").value,
     },
     timeout: parseInt(document.getElementById("timeout").value, 10),
+    resolutionFilter,
   };
 }
 
@@ -620,27 +497,31 @@ function generateManifestUrl() {
 document.getElementById("generateBtn").addEventListener("click", generateManifestUrl);
 
 document.getElementById("copyBtn").addEventListener("click", () => {
-  let url = document.getElementById("manifestUrl").textContent;
-  if (document.getElementById("manifestUrl").classList.contains("empty") || !url || url.includes("Click Generate")) {
+  const box = document.getElementById("manifestUrl");
+  let url = box.textContent;
+  if (box.classList.contains("empty") || !url || url.includes("Click Generate")) {
     url = generateManifestUrl();
   }
-  navigator.clipboard.writeText(url).then(() => toast("✓ Copied to clipboard!")).catch(() => {
-    const ta = document.createElement("textarea");
-    ta.value = url; document.body.appendChild(ta); ta.select();
-    document.execCommand("copy"); document.body.removeChild(ta);
-    toast("✓ Copied!");
-  });
+  navigator.clipboard.writeText(url)
+    .then(() => showToast("✓ Copied to clipboard!"))
+    .catch(() => {
+      const ta = document.createElement("textarea");
+      ta.value = url; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); document.body.removeChild(ta);
+      showToast("✓ Copied!");
+    });
 });
 
 document.getElementById("installBtn").addEventListener("click", () => {
-  let url = document.getElementById("manifestUrl").textContent;
-  if (document.getElementById("manifestUrl").classList.contains("empty") || !url || url.includes("Click Generate")) {
+  const box = document.getElementById("manifestUrl");
+  let url = box.textContent;
+  if (box.classList.contains("empty") || !url || url.includes("Click Generate")) {
     url = generateManifestUrl();
   }
   window.location.href = "stremio://" + url.replace(/^https?:\\/\\//, "");
 });
 
-function toast(msg) {
+function showToast(msg) {
   const el = document.getElementById("toast");
   el.textContent = msg;
   el.classList.add("show");

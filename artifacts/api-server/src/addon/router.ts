@@ -4,7 +4,7 @@ import { buildManifest } from "./manifest.js";
 import { buildConfigurePage } from "./configure.js";
 import { buildProviderTasks, fetchAllStreams } from "./providers/index.js";
 import { applyFormatter, isValidStreamUrl } from "./formatter.js";
-import { DEFAULT_CONFIG } from "./types.js";
+import { DEFAULT_CONFIG, PROVIDER_LIST, qualityRank, matchesResolutionFilter } from "./types.js";
 
 export function createAddonRouter(addonBasePath: string): Router {
   const router = Router();
@@ -52,6 +52,42 @@ export function createAddonRouter(addonBasePath: string): Router {
     res.send(html);
   });
 
+  router.get("/test-providers.json", async (_req: Request, res: Response) => {
+    const timeout = 5000;
+    const results = await Promise.allSettled(
+      PROVIDER_LIST.map(async (p) => {
+        const start = Date.now();
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), timeout);
+          const resp = await fetch(p.healthUrl, {
+            method: "HEAD",
+            signal: controller.signal,
+          }).finally(() => clearTimeout(timer));
+          return {
+            id: p.id,
+            name: p.name,
+            ok: resp.status < 500,
+            statusCode: resp.status,
+            latencyMs: Date.now() - start,
+          };
+        } catch {
+          return {
+            id: p.id,
+            name: p.name,
+            ok: false,
+            statusCode: 0,
+            latencyMs: Date.now() - start,
+          };
+        }
+      })
+    );
+    const statuses = results.map((r) =>
+      r.status === "fulfilled" ? r.value : { id: "unknown", name: "unknown", ok: false, statusCode: 0, latencyMs: 0 }
+    );
+    res.json({ providers: statuses });
+  });
+
   router.get("/:config/stream/:type/:id.json", async (req: Request, res: Response) => {
     const config = decodeConfig(String(req.params.config));
     const type = String(req.params.type);
@@ -64,7 +100,15 @@ export function createAddonRouter(addonBasePath: string): Router {
 
     const validStreams = rawStreams.filter((s) => isValidStreamUrl(s.url));
 
-    const formattedStreams = validStreams.map((s) =>
+    const filteredStreams = validStreams.filter((s) =>
+      matchesResolutionFilter(s.quality, config.resolutionFilter)
+    );
+
+    const sortedStreams = [...filteredStreams].sort(
+      (a, b) => qualityRank(b.quality) - qualityRank(a.quality)
+    );
+
+    const formattedStreams = sortedStreams.map((s) =>
       applyFormatter(s, config.formatter.nameTemplate, config.formatter.descTemplate)
     );
 
@@ -79,7 +123,12 @@ export function createAddonRouter(addonBasePath: string): Router {
     const tasks = buildProviderTasks(DEFAULT_CONFIG, tmdbId, type, season, episode);
     const rawStreams = await fetchAllStreams(tasks);
     const validStreams = rawStreams.filter((s) => isValidStreamUrl(s.url));
-    const formattedStreams = validStreams.map((s) =>
+
+    const sortedStreams = [...validStreams].sort(
+      (a, b) => qualityRank(b.quality) - qualityRank(a.quality)
+    );
+
+    const formattedStreams = sortedStreams.map((s) =>
       applyFormatter(
         s,
         DEFAULT_CONFIG.formatter.nameTemplate,

@@ -1,7 +1,16 @@
 import { AddonConfig, DEFAULT_CONFIG } from "./types.js";
 
 export function encodeConfig(config: Partial<AddonConfig>): string {
-  const merged = { ...DEFAULT_CONFIG, ...config };
+  const merged: AddonConfig = {
+    providers: config.providers ?? DEFAULT_CONFIG.providers,
+    showboxCookie: config.showboxCookie ?? DEFAULT_CONFIG.showboxCookie,
+    formatter: {
+      nameTemplate: config.formatter?.nameTemplate ?? DEFAULT_CONFIG.formatter.nameTemplate,
+      descTemplate: config.formatter?.descTemplate ?? DEFAULT_CONFIG.formatter.descTemplate,
+    },
+    timeout: config.timeout ?? DEFAULT_CONFIG.timeout,
+    resolutionFilter: config.resolutionFilter ?? DEFAULT_CONFIG.resolutionFilter,
+  };
   return Buffer.from(JSON.stringify(merged)).toString("base64url");
 }
 
@@ -17,6 +26,7 @@ export function decodeConfig(encoded: string): AddonConfig {
         descTemplate: parsed.formatter?.descTemplate ?? DEFAULT_CONFIG.formatter.descTemplate,
       },
       timeout: parsed.timeout ?? DEFAULT_CONFIG.timeout,
+      resolutionFilter: parsed.resolutionFilter ?? DEFAULT_CONFIG.resolutionFilter,
     };
   } catch {
     return DEFAULT_CONFIG;
