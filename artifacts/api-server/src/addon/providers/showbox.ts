@@ -21,6 +21,20 @@ interface ShowBoxResponse {
   data?: ShowBoxVersion[];
 }
 
+interface ShowBoxLoginResponse {
+  success?: boolean;
+  data?: {
+    token?: string;
+    jwt?: string;
+    access_token?: string;
+  };
+  token?: string;
+  jwt?: string;
+  access_token?: string;
+  message?: string;
+  error?: string;
+}
+
 async function getTmdbDetails(
   tmdbId: string,
   type: string,
@@ -76,6 +90,87 @@ function mapQuality(q: string): string {
 const QUALITY_ORDER: Record<string, number> = {
   Original: 6, "4K": 5, "1440p": 4, "1080p": 3, "720p": 2, "480p": 1, "360p": 0,
 };
+
+/** Try to login to ShowBox with email + password and return a fresh JWT. */
+export async function refreshShowBoxToken(
+  email: string,
+  password: string,
+  timeout: number
+): Promise<{ success: boolean; token?: string; error?: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  const LOGIN_ENDPOINTS = [
+    `${SHOWBOX_BASE}/user/login`,
+    `${SHOWBOX_BASE}/api/user/login`,
+    `${SHOWBOX_BASE}/api/login`,
+    `${SHOWBOX_BASE}/login`,
+  ];
+
+  const HEADERS = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+    Origin: SHOWBOX_BASE,
+    Referer: `${SHOWBOX_BASE}/login`,
+  };
+
+  try {
+    for (const url of LOGIN_ENDPOINTS) {
+      let res: Response;
+      try {
+        res = await fetch(url, {
+          method: "POST",
+          headers: HEADERS,
+          body: JSON.stringify({ email, password }),
+          signal: controller.signal,
+        });
+      } catch {
+        continue;
+      }
+
+      if (!res.ok) continue;
+
+      const raw = (await res.json()) as ShowBoxLoginResponse;
+
+      // Extract JWT from common response shapes
+      const token =
+        raw.data?.token ??
+        raw.data?.jwt ??
+        raw.data?.access_token ??
+        raw.token ??
+        raw.jwt ??
+        raw.access_token;
+
+      if (token) {
+        return { success: true, token };
+      }
+
+      // Some APIs return the full JWT in a Set-Cookie header
+      const setCookie = res.headers.get("set-cookie");
+      if (setCookie) {
+        const jwtMatch = setCookie.match(/token=([^;]+)/);
+        if (jwtMatch) return { success: true, token: jwtMatch[1] };
+        const eyMatch = setCookie.match(/(eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+)/);
+        if (eyMatch) return { success: true, token: eyMatch[1] };
+      }
+
+      // API responded OK but no token — indicate wrong credentials
+      const errMsg = raw.message ?? raw.error ?? "Login failed — check credentials";
+      return { success: false, error: String(errMsg) };
+    }
+
+    return { success: false, error: "Could not reach ShowBox login endpoint" };
+  } catch (err) {
+    if ((err as Error).name === "AbortError") {
+      return { success: false, error: "Request timed out" };
+    }
+    return { success: false, error: (err as Error).message ?? "Connection failed" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function getShowBoxStreams(
   tmdbId: string,

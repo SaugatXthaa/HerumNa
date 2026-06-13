@@ -37,36 +37,27 @@ const EXTERNAL = [
   "zeromq-prebuilt", "playwright", "puppeteer", "puppeteer-core", "electron",
 ];
 
-const SHARED = {
-  platform: "node",
-  bundle: true,
-  format: "esm",
-  outExtension: { ".js": ".mjs" },
-  logLevel: "info",
-  external: EXTERNAL,
-  sourcemap: "linked",
-  banner: BANNER,
-  plugins: [esbuildPluginPino({ transports: ["pino-pretty"] })],
-};
-
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  // Build 1: standalone server (for Render / Railway / self-host)
+  // Single esbuild call with both entry points so esbuild-plugin-pino
+  // only runs once and never tries to overwrite its own worker files.
   await esbuild({
-    ...SHARED,
-    entryPoints: [path.resolve(artifactDir, "src/index.ts")],
-    outdir: distDir,
-  });
-
-  // Build 2: Vercel serverless handler (exports Express app, no listen())
-  await esbuild({
-    ...SHARED,
-    entryPoints: [path.resolve(artifactDir, "src/vercel.ts")],
-    outdir: distDir,
-    // Suppress duplicate pino worker files since they were already emitted above
+    platform: "node",
+    bundle: true,
+    format: "esm",
+    outExtension: { ".js": ".mjs" },
+    logLevel: "info",
+    external: EXTERNAL,
+    sourcemap: "linked",
+    banner: BANNER,
     plugins: [esbuildPluginPino({ transports: ["pino-pretty"] })],
+    entryPoints: [
+      path.resolve(artifactDir, "src/index.ts"),
+      path.resolve(artifactDir, "src/vercel.ts"),
+    ],
+    outdir: distDir,
   });
 }
 

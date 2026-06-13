@@ -5,6 +5,7 @@ import { buildConfigurePage } from "./configure.js";
 import { buildProviderTasks, fetchAllStreams } from "./providers/index.js";
 import { applyFormatter, isValidStreamUrl } from "./formatter.js";
 import { DEFAULT_CONFIG, PROVIDER_LIST, qualityRank, matchesResolutionFilter } from "./types.js";
+import { refreshShowBoxToken } from "./providers/showbox.js";
 
 export function createAddonRouter(addonBasePath: string): Router {
   const router = Router();
@@ -86,6 +87,21 @@ export function createAddonRouter(addonBasePath: string): Router {
       r.status === "fulfilled" ? r.value : { id: "unknown", name: "unknown", ok: false, statusCode: 0, latencyMs: 0 }
     );
     res.json({ providers: statuses });
+  });
+
+  /** POST /showbox-refresh — attempt to auto-login and return a fresh JWT */
+  router.post("/showbox-refresh", async (req: Request, res: Response) => {
+    const body = req.body as { email?: string; password?: string };
+    const email = String(body.email ?? "").trim();
+    const password = String(body.password ?? "").trim();
+
+    if (!email || !password) {
+      res.status(400).json({ success: false, error: "email and password are required" });
+      return;
+    }
+
+    const result = await refreshShowBoxToken(email, password, 12000);
+    res.json(result);
   });
 
   router.get("/:config/stream/:type/:id.json", async (req: Request, res: Response) => {

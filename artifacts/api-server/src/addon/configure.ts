@@ -242,20 +242,41 @@ export function buildConfigurePage(config: AddonConfig, baseUrl: string): string
     </div>
   </div>
 
-  <!-- SHOWBOX COOKIE -->
+  <!-- SHOWBOX AUTH -->
   <div class="card">
     <div class="card-header">
       <div class="card-icon blue">🔑</div>
       <span class="card-title">ShowBox Authentication</span>
+      <span class="card-sub" id="sbStatusBadge"></span>
     </div>
     <div class="card-body">
-      <div class="field">
-        <div class="field-label">
-          JWT Cookie Token
-          <span class="field-hint">required for ShowBox streams</span>
+      <div id="sbConnectForm">
+        <div class="field">
+          <div class="field-label">Email <span class="field-hint">your ShowBox account</span></div>
+          <input type="email" class="input" id="sbEmail" placeholder="email@example.com" autocomplete="email" />
         </div>
-        <textarea class="textarea" id="showboxCookie" rows="3" placeholder="Paste your ShowBox JWT token here…">${config.showboxCookie}</textarea>
+        <div class="field">
+          <div class="field-label">Password</div>
+          <input type="password" class="input" id="sbPassword" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <div class="btn-row" style="margin-top:4px;">
+          <button class="btn btn-primary" id="sbConnectBtn" onclick="connectShowBox()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Connect ShowBox
+          </button>
+        </div>
+        <div id="sbMsg" style="margin-top:10px;font-size:0.78rem;display:none;"></div>
       </div>
+
+      <div class="divider"></div>
+
+      <details id="sbManualDetails">
+        <summary style="cursor:pointer;font-size:0.8rem;color:var(--text-3);user-select:none;padding:2px 0;">▸ Paste JWT token manually</summary>
+        <div class="field" style="margin-top:10px;">
+          <div class="field-label">JWT Cookie Token <span class="field-hint">required for ShowBox streams</span></div>
+          <textarea class="textarea" id="showboxCookie" rows="3" placeholder="Paste your ShowBox JWT token here…">${config.showboxCookie}</textarea>
+        </div>
+      </details>
     </div>
   </div>
 
@@ -529,6 +550,84 @@ function showToast(msg) {
 }
 
 generateManifestUrl();
+
+// ── ShowBox auto-login ─────────────────────────────────────────────────────
+function sbDecodeExpiry(jwt) {
+  try {
+    const payload = JSON.parse(atob(jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.exp ? payload.exp * 1000 : null;
+  } catch { return null; }
+}
+
+function sbUpdateStatus() {
+  const cookie = document.getElementById("showboxCookie").value.trim();
+  const badge = document.getElementById("sbStatusBadge");
+  if (!cookie) { badge.textContent = ""; badge.className = "card-sub"; return; }
+  const exp = sbDecodeExpiry(cookie);
+  if (!exp) { badge.textContent = "⚠ unreadable"; badge.style.color = "var(--yellow)"; return; }
+  const days = Math.round((exp - Date.now()) / 86400000);
+  if (days < 0) {
+    badge.textContent = "✗ expired";
+    badge.style.color = "var(--red)";
+  } else if (days < 7) {
+    badge.textContent = "⚠ expires in " + days + "d";
+    badge.style.color = "var(--yellow)";
+  } else {
+    badge.textContent = "✓ valid · " + days + "d left";
+    badge.style.color = "var(--green)";
+  }
+}
+document.getElementById("showboxCookie").addEventListener("input", sbUpdateStatus);
+sbUpdateStatus();
+
+async function connectShowBox() {
+  const email = document.getElementById("sbEmail").value.trim();
+  const password = document.getElementById("sbPassword").value.trim();
+  const btn = document.getElementById("sbConnectBtn");
+  const msg = document.getElementById("sbMsg");
+
+  if (!email || !password) {
+    msg.style.display = "block";
+    msg.style.color = "var(--yellow)";
+    msg.textContent = "⚠ Enter your ShowBox email and password first.";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Connecting…";
+  msg.style.display = "none";
+
+  try {
+    const resp = await fetch(BASE_URL + "/showbox-refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await resp.json();
+
+    if (data.success && data.token) {
+      const ta = document.getElementById("showboxCookie");
+      ta.value = data.token;
+      sbUpdateStatus();
+      // Auto-expand manual section so user can see the token was set
+      document.getElementById("sbManualDetails").open = true;
+      msg.style.display = "block";
+      msg.style.color = "var(--green)";
+      msg.textContent = "✓ Connected! Token saved — generate your manifest link below.";
+    } else {
+      msg.style.display = "block";
+      msg.style.color = "var(--red)";
+      msg.textContent = "✗ " + (data.error || "Login failed. Try pasting your token manually.");
+    }
+  } catch {
+    msg.style.display = "block";
+    msg.style.color = "var(--red)";
+    msg.textContent = "✗ Network error — try pasting your token manually.";
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Connect ShowBox';
+  }
+}
 </script>
 </body>
 </html>`;

@@ -1,1 +1,1 @@
-- [Vercel + Express monorepo](vercel-monorepo-express.md) — copy pre-built bundle to api/index.mjs in buildCommand; functions key does NOT use outputDirectory path
+- [Vercel monorepo Express deployment](vercel-monorepo-express.md) — committed api/index.js CJS bridge + includeFiles; single esbuild call avoids pino plugin conflict on Vercel
